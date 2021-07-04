@@ -1,0 +1,17 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+wxpython = "*"
+cefpython3 = "*"
+pyobjc = "*"
+exif = "*"
+# This project seems to require pygtk3, but pygtk3 in OSX doesn't seem to like pip
+#pygtk = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.7"
