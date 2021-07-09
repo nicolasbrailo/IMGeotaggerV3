@@ -72,8 +72,6 @@ def set_exif_position(path, coords):
     lat_ref = 'S' if lat < 0 else 'N'
     lon_ref = 'W' if lon < 0 else 'E'
 
-    print(f"XXX lat={frac_lat}{lat_ref} lon={frac_lon}{lon_ref}")
-
     img.modify_exif({
         LAT_KEY: frac_lat,
         LON_KEY: frac_lon,
