@@ -1,5 +1,5 @@
 from collections import namedtuple
-import exif
+from img_exif import get_exif_position, set_exif_position
 import math
 import os
 import sys
@@ -46,7 +46,7 @@ class ImgManager:
 
         for (path, preview) in previews:
             try:
-                coords_set = 'Y' if ImgManager.get_position(path) is not None else 'N'
+                coords_set = 'Y' if self.get_position(path) is not None else 'N'
             except:
                 print(f"Error loading coords for {file_path}", sys.exc_info()[0])
                 coords_set = 'N'
@@ -91,77 +91,15 @@ class ImgManager:
 
         for fn in paths:
             fullpath = self.get_full_path_for(fn)
-            if ImgManager.set_position(fullpath, pos):
+            if set_exif_position(fullpath, pos):
                 self.positions_cache[fullpath] = pos
                 print("Set", fn, "to position", pos)
             else:
                 print("Failed setting", fn, "to position", pos)
 
 
-    @staticmethod
-    def set_position(path, coords):
-        try:
-            img = exif.Image(path)
-        except:
-            print(f"Couldn't open image metadata for {path}")
-            return False
-
-        lat, lon = coords
-        print(f"lat={lat} lon={lon}")
-        img.gps_latitude = ImgManager._dec_to_sex(lat)
-        img.gps_longitude = ImgManager._dec_to_sex(lon)
-        img.gps_latitude_ref = 'S' if lat < 0 else 'N'
-        img.gps_longitude_ref = 'W' if lon < 0 else 'E'
-
-        try:
-            tmp = tempfile.NamedTemporaryFile(delete=False)
-            tmp.write(img.get_file())
-            tmp.close()
-            os.replace(tmp.name, path)
-            return True
-        except:
-            print(f"Error saving coords for {file_path}", sys.exc_info()[0])
-            return False
-
-
     def get_position(self, path):
-        if self.positions_cache[path] is None:
-            self.positions_cache[path] = ImgManager.get_position(path)
+        if path not in self.positions_cache:
+            self.positions_cache[path] = get_exif_position(path)
         return self.positions_cache[path]
-
-
-    @staticmethod
-    def get_position(path):
-        try:
-            img = exif.Image(path)
-        except:
-            print(f"Couldn't open image metadata for {path}")
-            return None
-
-        try:
-            lat = ImgManager._sex_to_dec(img.gps_latitude)
-            lon = ImgManager._sex_to_dec(img.gps_longitude)
-            return f"{lat:.5f}{img.gps_latitude_ref} {lon:.5f}{img.gps_longitude_ref}"
-        except AttributeError:
-            return None
-        except ValueError:
-            return None
-        except KeyError:
-            return None
-
-
-    @staticmethod
-    def _dec_to_sex(x):
-        x = abs(x)
-        degs = int(math.floor(x))
-        mins = int(math.floor(60 * (x - degs)))
-        secs = round(60 * (60 * (x - degs) - mins), 4)
-        return (degs, mins, secs)
-
-
-    @staticmethod
-    def _sex_to_dec(s):
-        (degs, mins, secs) = s
-        return degs + ((mins + (secs / 60.)) / 60.)
-
 
