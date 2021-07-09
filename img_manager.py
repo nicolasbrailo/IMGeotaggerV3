@@ -81,7 +81,7 @@ class ImgManager:
                     file_coord = 'Multiple positions'
                     break
 
-        return f"{file_selection}\nFiles position: {file_coord}"""
+        return f"{file_selection}\nFile position: {file_coord}"""
 
 
     def set_positions_for(self, pos, paths):

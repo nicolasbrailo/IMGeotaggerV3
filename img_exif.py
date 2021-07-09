@@ -34,12 +34,15 @@ def frac_to_sex(f):
         if den == 0:
             den = 1
         return float(int(n[0])) /den 
+    if f == None or len(f.split()) != 3:
+        return None
     ns = [num(x) for x in f.split()]
     return ns[0], ns[1], ns[2]
 
 
 def frac_to_dec(f):
-    return sex_to_dec(frac_to_sex(f))
+    f = frac_to_sex(f)
+    return sex_to_dec(f) if f else None
 
 
 def get_exif_position(path):
@@ -52,8 +55,20 @@ def get_exif_position(path):
     try:
         lat = frac_to_dec(meta[LAT_KEY])
         lon = frac_to_dec(meta[LON_KEY])
+        if lat is None or lon is None:
+            print(f"Error loading position for {path}, lat/lon wasn't a number")
+            return None
+
         lat_ref = meta[LAT_REF_KEY]
+        if lat_ref.upper() not in ['N', 'S']:
+            print(f"Error loading position for {path}, lat ref wasn't valid")
+            return None
+
         lon_ref = meta[LON_REF_KEY]
+        if lon_ref.upper() not in ['W', 'E']:
+            print(f"Error loading position for {path}, lon ref wasn't valid")
+            return None
+
         return f"{lat:.5f}{lat_ref} {lon:.5f}{lon_ref}"
     except KeyError:
         return None
