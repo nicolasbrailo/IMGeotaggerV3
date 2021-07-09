@@ -22,6 +22,7 @@ class ImgManager:
         # To speed it up, it should load the images in a bg thread and notify
         # the UI thread as images become available
         self.imgs = []
+        self.positions_cache = {}
         if not os.path.isdir(path): return
 
         lst = os.listdir(path)
@@ -64,18 +65,18 @@ class ImgManager:
 
 
     def get_description_for(self, files):
-        if files == None:
+        if files == None or len(files) == 0:
             file_selection = 'No file selected'
             file_coord = "-"
         elif len(files) == 1:
             file_selection = files[0]
-            file_coord = ImgManager.get_position(self.get_full_path_for(files[0]))
+            file_coord = self.get_position(self.get_full_path_for(files[0]))
         else:
             file_selection = 'Multiple files selected'
-            coord_0 = ImgManager.get_position(self.get_full_path_for(files[0]))
+            coord_0 = self.get_position(self.get_full_path_for(files[0]))
             file_coord = str(coord_0)
             for fn in files:
-                coord = ImgManager.get_position(self.get_full_path_for(fn))
+                coord = self.get_position(self.get_full_path_for(fn))
                 if coord != coord_0:
                     file_coord = 'Multiple positions'
                     break
@@ -91,6 +92,7 @@ class ImgManager:
         for fn in paths:
             fullpath = self.get_full_path_for(fn)
             if ImgManager.set_position(fullpath, pos):
+                self.positions_cache[fullpath] = pos
                 print("Set", fn, "to position", pos)
             else:
                 print("Failed setting", fn, "to position", pos)
@@ -105,6 +107,7 @@ class ImgManager:
             return False
 
         lat, lon = coords
+        print(f"lat={lat} lon={lon}")
         img.gps_latitude = ImgManager._dec_to_sex(lat)
         img.gps_longitude = ImgManager._dec_to_sex(lon)
         img.gps_latitude_ref = 'S' if lat < 0 else 'N'
@@ -121,6 +124,12 @@ class ImgManager:
             return False
 
 
+    def get_position(self, path):
+        if self.positions_cache[path] is None:
+            self.positions_cache[path] = ImgManager.get_position(path)
+        return self.positions_cache[path]
+
+
     @staticmethod
     def get_position(path):
         try:
@@ -133,6 +142,8 @@ class ImgManager:
             lat = ImgManager._sex_to_dec(img.gps_latitude)
             lon = ImgManager._sex_to_dec(img.gps_longitude)
             return f"{lat:.5f}{img.gps_latitude_ref} {lon:.5f}{img.gps_longitude_ref}"
+        except AttributeError:
+            return None
         except ValueError:
             return None
         except KeyError:
