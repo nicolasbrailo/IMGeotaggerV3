@@ -1,3 +1,4 @@
+import threading
 import wx
 
 class ImgBrowser:
@@ -9,6 +10,8 @@ class ImgBrowser:
     def __init__(self, app, parent_wnd, img_preview_size):
         self.panel = wx.Panel(parent_wnd, -1)
         self.app = app
+        self.img_preview_size = img_preview_size
+        self.bg = None
 
         start_lbl = self.app.get_description_for(None)
         self.selection_detail = wx.StaticText(self.panel, -1, style=wx.TE_MULTILINE, label=start_lbl)
@@ -30,8 +33,8 @@ class ImgBrowser:
         self.imgs.InsertColumn(1, 'Pos', width=ImgBrowser.COORDS_COL_WIDTH)
         self.imgs.InsertColumn(2, 'Name', width=ImgBrowser.NAME_COL_WIDTH)
 
-        self.list=wx.ImageList(*img_preview_size)
-        self.imgs.SetImageList(self.list, wx.IMAGE_LIST_SMALL)
+        self.previews_lst = wx.ImageList(*img_preview_size)
+        self.imgs.SetImageList(self.previews_lst, wx.IMAGE_LIST_SMALL)
 
         self.dir_select = wx.DirPickerCtrl(parent_wnd)
         self.dir_select.Bind(wx.EVT_DIRPICKER_CHANGED, self._on_path_selected)
@@ -47,18 +50,36 @@ class ImgBrowser:
         box.Add(self.imgs, wx.EXPAND)
         self.panel.SetSizer(box)
 
-    
+
     def _on_path_selected(self, _):
         # First clear list, otherwise the list may hold refs to a cleand up img
         self.imgs.DeleteAllItems()
+        self.previews_lst.RemoveAll()
         path = self.dir_select.GetPath()
         row=0
         for img in self.app.load_images_from(path):
-            browserimg=self.list.Add(img.preview)
+            browserimg=self.previews_lst.Add(img.preview)
             self.imgs.InsertItem(row, browserimg)
             self.imgs.SetItem(row, 1, img.coords_set)
             self.imgs.SetItem(row, 2, img.fname)
             row += 1
+
+        if self.bg:
+            self.bg.join()
+        self.bg = threading.Thread(target=self._previews_bg_load)
+        self.bg.start()
+
+
+    def _previews_bg_load(self):
+        for i in range(self.imgs.GetItemCount()):
+            fname = self.imgs.GetItem(i, 2).GetText()
+            preview = self.app.get_image_preview(fname)
+            self.previews_lst.Replace(i, preview)
+            if self.imgs.IsVisible(i):
+                # The only way to refresh the items in the list seem to be to
+                # change the scroll position or to re-set its image list.
+                # Calling .RefreshItem(i), .Refresh() or .Update() doesn't work
+                self.imgs.SetImageList(self.previews_lst, wx.IMAGE_LIST_SMALL)
 
 
     @staticmethod

@@ -73,6 +73,10 @@ class Main(wx.App):
         return self.img_manager.imgs
 
     
+    def get_image_preview(self, fname):
+        return self.img_manager.get_image_preview(fname)
+
+    
     def set_gps_coords_for(self, paths):
         pos = self.browser.get_coords()
         self.img_manager.set_positions_for(pos, paths)

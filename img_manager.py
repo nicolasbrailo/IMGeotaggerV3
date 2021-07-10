@@ -1,60 +1,55 @@
-from collections import namedtuple
 from img_exif import get_exif_position, set_exif_position
 import math
 import os
 import sys
 import tempfile
+import threading
 import wx
 
-Img = namedtuple('Img', 'preview path fname coords_set')
+
+# Named tuples are immutable
+class Img:
+    def __init__(self, preview, path, fname, coords_set):
+        self.preview = preview
+        self.path = path
+        self.fname = fname
+        self.coords_set = coords_set
+
 
 class ImgManager:
     def __init__(self, preview_size, start_path=None):
         self._allowed_extensions = ['JPG', 'JPEG']
         self.preview_size = preview_size
         self.imgs = []
+        self.bg = None
+        self.preview_not_loaded = self.build_preview('./loading.png')
         if start_path is not None:
             self.reload(start_path)
 
 
     def reload(self, path):
-        # TODO this is slow and blocks the UI thread
-        # To speed it up, it should load the images in a bg thread and notify
-        # the UI thread as images become available
         self.imgs = []
         self.positions_cache = {}
         if not os.path.isdir(path): return
 
-        lst = os.listdir(path)
-        lst.sort()
-        files = []
-        for filename in lst:
-            for ext in self._allowed_extensions:
-                if filename.upper().endswith(ext.upper()):
-                    files.append(os.path.join(path, filename))
-
-        previews = []
-        for file_path in files:
+        for fp in self.ls(path):
             try:
-                print(f"Loading {file_path}")
-                preview = wx.Image(file_path , wx.BITMAP_TYPE_ANY)
-                preview = preview.Scale(*self.preview_size, wx.IMAGE_QUALITY_NORMAL)
-                preview = wx.Bitmap(preview)
-                previews.append((file_path, preview))
+                self.imgs.append(Img(preview=self.preview_not_loaded,
+                                     path=fp,
+                                     fname=os.path.split(fp)[1],
+                                     coords_set=self.has_coords(fp)))
             except:
-                print(f"Error loading {file_path}", sys.exc_info()[0])
+                print(f"Error loading {fp}", sys.exc_info()[0])
 
-        for (path, preview) in previews:
-            try:
-                coords_set = 'Y' if self.get_position(path) is not None else 'N'
-            except:
-                print(f"Error loading coords for {file_path}", sys.exc_info()[0])
-                coords_set = 'N'
 
-            self.imgs.append(Img(preview=preview,
-                            path=path,
-                            fname=os.path.split(path)[1],
-                            coords_set=coords_set))
+    def get_image_preview(self, fname):
+        for img in self.imgs:
+            if img.fname == fname:
+                img.preview = self.build_preview(img.path)
+                return img.preview
+
+        print(f"{fname} isn't a loaded file, this shouldn't happen (but I'm sure it will)")
+        return self.preview_not_loaded
 
 
     def get_full_path_for(self, fname):
@@ -102,4 +97,35 @@ class ImgManager:
         if path not in self.positions_cache:
             self.positions_cache[path] = get_exif_position(path)
         return self.positions_cache[path]
+
+
+    def ls(self, path):
+        lst = os.listdir(path)
+        lst.sort()
+        files = []
+        for filename in lst:
+            for ext in self._allowed_extensions:
+                if filename.upper().endswith(ext.upper()):
+                    files.append(os.path.join(path, filename))
+        return files
+
+
+    def has_coords(self, path):
+        try:
+            return 'Y' if self.get_position(path) is not None else 'N'
+        except:
+            print(f"Error loading coords for {file_path}", sys.exc_info()[0])
+            return 'N'
+
+
+    def build_preview(self, path):
+        try:
+            preview = wx.Image(path, wx.BITMAP_TYPE_ANY)
+            preview = preview.Scale(*self.preview_size, wx.IMAGE_QUALITY_NORMAL)
+            return wx.Bitmap(preview)
+        except:
+            print(f"Error creating preview for {path}", sys.exc_info()[0])
+            return self.preview_not_loaded
+
+
 
